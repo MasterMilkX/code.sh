@@ -1,5 +1,7 @@
 
-//////////    SET UP ALL THE IMAGES AND OBJECTS   /////////////
+//////////////    SET UP ALL THE IMAGES AND OBJECTS   //////////////////
+
+////////   gui and screens   //////////
 
 //set up the canvas
 var canvas = document.createElement("canvas");
@@ -17,6 +19,26 @@ bgPNG.src = "../img/background.png";
 bgPNG.onload = function(){
   ctx.drawImage(bgPNG, 0, 0);
 };
+
+//status bar guis
+var caffeineBar = new Image();
+caffeineBar.src = "../img/caffeine_bar.png";
+var caffeineBarReady = false;
+caffeineBar.onload = function(){caffeineBarReady = true;};
+
+var codeBar = new Image();
+codeBar.src = "../img/code_bar.png";
+var codeBarReady = false;
+codeBar.onload = function(){codeBarReady = true;};
+
+//text output 
+var terminal = [];
+var maxTerm = 3;
+var maxHistory = 20;
+function termOut(text, color){
+	this.text = text;
+	this.color = color;
+}
 
 ////////   moving players  ////////
 
@@ -41,10 +63,15 @@ var coder = {
 	show : true,
 
 	//bars
-	caffeine: 10,
-	code: 0
+	caffeine: 50,
+	code: 50,
 
+	//other properties
+	canInteract : true,
+	curObject : null
 }
+
+
 
 
 //trolls
@@ -112,10 +139,12 @@ var coffeeReady = false;
 coffeeIMG.onload = function(){coffeeReady = true;};
 var coffee = {
 	name : "coffee",
+
 	x : 1*scale, 
 	y : 13 * scale,
 	width : 5*scale,
 	height : 5*scale,
+
 	img : coffeeIMG,
 	ready : coffeeReady,
 
@@ -130,10 +159,12 @@ var booksReady = false;
 booksIMG.onload = function(){booksReady = true;};
 var books = {
 	name : "books",
+
 	x : 7*scale, 
 	y : 9 * scale,
 	width : 7*scale,
 	height : 9*scale,
+
 	img : booksIMG,
 	ready : booksReady,
 
@@ -251,6 +282,20 @@ function inArr(arr, e){
 }
 
 
+////////////////    OBJECT INTERACTION   ///////////////
+
+//determine which object a character is in front of
+function getObjInteraction(character){
+	var midpt = Math.round((character.x + (character.width / 2)));
+	for(var o=0;o<stuff.length;o++){
+		var obj = stuff[o];
+		if((obj.x < midpt && (obj.x + obj.width) > midpt))
+			return obj;
+	}
+	return null;
+}
+
+
 //////////////////  PLAYER CONTROLS /////////////////
 
 document.body.addEventListener("keydown", function (e) {
@@ -265,9 +310,10 @@ document.body.addEventListener("keydown", function (e) {
 document.body.addEventListener("keyup", function (e) {
   if(inArr(moveKeySet, e.keyCode)){
 	 keys[e.keyCode] = false;
+	 coder.curObject = null;
   }else if(inArr(actionKeySet, e.keyCode)){
 	 keys[e.keyCode] = false;
-	 reInteract = true;
+	 coder.canInteract = true;
   }
 });
 
@@ -285,6 +331,13 @@ function keyboard(){
 	}else if(keys[leftKey]){
 		coder.dir = "left";
 		coder.x -= coder.speed;
+	}else if(keys[upKey] && !coder.curObject){
+		obj = getObjInteraction(coder);
+		if(obj){
+			coder.curObject = obj;
+			console.log(obj.name);
+			terminal.push(new termOut(obj.name, "#ffffff"));
+		}
 	}
 }
 
@@ -297,10 +350,12 @@ function render(){
   	ctx.clearRect(0, 0, canvas.width,canvas.height); 	//clear everything
 
   	ctx.drawImage(bgPNG, 0, 0);			//draw the background
+  	drawStatusBars();					//draw the status bar guis
   	for(var o=0;o<stuff.length;o++){	//draw objects 
   		drawObject(stuff[o]);
   	}
 	drawChar(coder);				//draw the player
+	stdout()						//draw the output
 
 
 	ctx.restore();
@@ -320,6 +375,12 @@ function checkRender(){
 		if(!obj.ready)
 			obj.img.onload = function(){obj.ready = true;};
 	}
+
+	//check if gui loaded
+	if(!caffeineBarReady)
+		caffeineBar.onload = function(){caffeineBarReady = true;};
+	if(!codeBarReady)
+		codeBar.onload = function(){codeBarReady = true;};
 	
 }
 
@@ -345,6 +406,53 @@ function drawObject(obj){
 		obj.width, obj.height);
 }
 
+//wrap the text if overflowing on the dialog
+function stdout() {
+	//check if overflow
+	if(terminal.length > maxHistory)
+		terminal.shift();
+
+	//setup
+	ctx.font = "24px Fixedsys";
+  	
+
+  	//find counting index
+  	var ct = (terminal.length > maxTerm ? terminal.length-maxTerm : 0);
+  	var dt = 0;
+
+  	while(ct < terminal.length){
+  		ctx.fillStyle = terminal[ct].color;
+  		ctx.fillText(terminal[ct].text, 16, 232+(dt*30));
+  		ct++;
+  		dt++;
+  	}
+
+}
+
+//draw the status bars for code and caffeine
+function drawStatusBars(){
+	ctx.font = "20px Monaco";
+  	ctx.fillStyle = "#0000FF"
+
+	//caffeine
+	ctx.drawImage(caffeineBar,
+		0, 0,
+		caffeineBar.width, caffeineBar.height,
+		120, 10,
+		coder.caffeine*1.9, caffeineBar.height
+	);
+
+	//code
+	ctx.drawImage(codeBar,
+		0, 0,
+		codeBar.width, codeBar.height,
+		523-(coder.code*1.9), 10,
+		coder.code*1.9, codeBar.height
+	);
+
+	//code percent text
+	ctx.fillText(coder.code + "%", 595, 28)
+}
 
 //////////      UPDATE AND STUFF     /////////////
 //main running function for the game
