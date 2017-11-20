@@ -1,6 +1,6 @@
 + terminal scrolling 
-- change item state
++ change item state
 - random AI encounter
-- coding minigame
++ coding minigame
 - 8-bit music
 + set room boundaries

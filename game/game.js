@@ -11,7 +11,10 @@ canvas.width = 640;
 canvas.height = 320;
 document.body.appendChild(canvas);
 
+//game properties
 var scale = 10;
+var gameover = false;
+
 
 //make the room
 var bgPNG = new Image();
@@ -86,7 +89,7 @@ var coder = {
 
 	//bars
 	caffeine: 50,
-	code: 50,
+	code: 0,
 
 	//other properties
 	canInteract : true,
@@ -194,7 +197,22 @@ var books = {
 
 	state : "stock",
 	anim : {"stock" : 0},
-	unlock : false
+	unlock : false,
+	quotes : ["'I AM ERROR'", 
+			"'Talk is cheap. Show me the code'",
+			"'hail;m io\\\\'",
+			"'> fortune | cowsay'",
+			"'What, you egg? [He stabs him.]'",
+			"'Nevermore' - E.A.P.",
+			"'Err.. what was your name again?",
+			"'Never knows best'",
+			"'Greetins, programs!'",
+			"'Sorry, I'm dead'",
+			"'You have died of dysentery'",
+			"'All your base are belong to us'",
+			"'o shit whaddup'",
+			"'Bee boo boo bop boo boo bop'"],
+	curQuote : 0
 }
 
 //fridge
@@ -213,7 +231,14 @@ var fridge = {
 
 	state : "close",
 	anim : {"close" : 0, "full" : 1, "empty":2},
-	unlock : false
+	unlock : false,
+	foods : [new food("chocolate", 10), new food("super spaghetti", 15), new food("super pizza", 20), new food("MONSTER", 50)]
+}
+
+//food boost
+function food(name, boost){
+	this.name = name;
+	this.boost = boost;
 }
 
 //computer
@@ -237,7 +262,9 @@ var computer = {
 	program_index : 0,
 	curProgram : null,
 	action : "code select",
-	option_index : 0
+	option_index : 0,
+
+	codeCt : 0		//determines how many codes you have
 }
 //countdown for compiler
 var ct = 0;
@@ -245,9 +272,9 @@ var comp_keyTick = 0;
 
 //programs
 var all_programs = ["code.sh", "fire.sh", "coffee.sh", "fridge.sh", "book.sh", "table.sh", "win.sh", "ilu.sh"];
-function program(name, options, time, bug_rate, run_funct){
+function program(name, time, bug_rate, run_funct){
 	this.name = name;
-	this.options = options;
+	this.options = ["code"];
 	this.time = time;
 	this.bug_rate = bug_rate;
 	this.run_funct = run_funct;
@@ -269,10 +296,24 @@ var table = {
 	ready : tableReady,
 
 	state : "empty",
+	things : [new thing("empty", "...nothing found..."),
+			new thing("rubik", "ooh... a colorful cube!"),
+			new thing("chicken", "mmm... looks like chicken"),
+			new thing("pixel", "...glitch?"),
+			new thing("robot", "BEEP BOOP"),
+			new thing("boombox", "good jam"),
+			new thing("ufo", "-object unidentified-")],
+	curThing : new thing("empty", "...nothing found..."),
 	anim : {"empty" : 0, "rubik" : 1, "chicken" : 2, 
 			"pixel" : 3, "robot" : 4, "boombox" : 5, 
 			"ufo" : 6} ,
 	unlock : false
+}
+
+//switch t
+function thing(name, text){
+	this.name = name;
+	this.text = text;
 }
 
 //door
@@ -291,7 +332,7 @@ var door = {
 
 	state : "close",
 	anim : {"close" : 1, "open" : 0} ,
-	unlock : true
+	unlock : true,
 
 
 }
@@ -327,6 +368,7 @@ function inArr(arr, e){
 ////////////////    OBJECT INTERACTION   ///////////////
 
 
+//sets fire to a random object
 function setFire(){
 	var randObj = Math.floor(Math.random() * stuff.length);
 	var obj = stuff[randObj];
@@ -334,23 +376,7 @@ function setFire(){
 	fire.x = obj.x + Math.floor(obj.width/4);
 	fire.y = obj.y - Math.floor(obj.height/4);
 	fire.obj = obj;
-	console.log(obj.x);
 }
-
-//sets fire to an object
-/*
-function setFire(obj){
-	if(obj == null){
-		var randObj = Math.floor(Math.random() * stuff.length);
-		obj = stuff[randObj];
-	}
-	
-	fire.show = true;
-	fire.x = obj.x + (obj.width/2);
-	fire.y = obj.y + (obj.height/2);
-	fire.time = Math.floor(Math.random() * 10);
-}
-*/
 
 //determine which object a character is in front of
 function getObjInteraction(character){
@@ -363,6 +389,7 @@ function getObjInteraction(character){
 	return null;
 }
 
+//find object given the name
 function getObjbyName(name){
 	for(var o=0;o<stuff.length;o++){
 		if(stuff[o].name === name)
@@ -372,7 +399,138 @@ function getObjbyName(name){
 
 //object interact
 function objInteract(obj){
+	//computer inteaction
+	if(obj == computer && !processing()){
+		codeStat[1] = new termOut("  > " + computer.programs[computer.program_index].name, "#ffffff");
+		coder.canMove = false;
+	}
+	//coffee interaction
+	else if(obj == coffee){
+		if(coffee.state === "full"){
+			//add to caffeine bar and cap it off
+			coder.caffeine += 25;
+			if(coder.caffeine >= 100)
+				coder.caffeine = 100;
 
+			terminal.push(new termOut("coffee boost gained!", "#8B5907"));
+			coffee.state = "empty";
+		}else{
+			terminal.push(new termOut("ERROR - Coffee not found!", "#ff0000"));
+		}
+	}
+	//door interaction
+	else if(obj == door){
+		if(door.state === "close"){
+			door.state = "open";
+			terminal.push(new termOut("door opened", "#bebebe"));
+		}else if(door.state === "open"){
+			door.state = "close";
+			terminal.push(new termOut("door closed", "#bebebe"));
+		}
+	}
+	//books interaction
+	else if(obj == books){
+		if(!books.unlock)
+			terminal.push(new termOut("Access denied - " + obj.name + ".sh", "#ff0000"));
+		else{
+			terminal.push(new termOut(books.quotes[books.curQuote], "#ffffff"));
+		}
+	}
+	//fridge interaction
+	else if(obj == fridge){
+		if(!fridge.unlock)
+			terminal.push(new termOut("Access denied - " + obj.name + ".sh", "#ff0000"));
+		else{
+			//closed door
+			if(fridge.state === "close"){
+				if(fridge.foods.length > 0)
+					fridge.state = "full";
+				else
+					fridge.state = "empty";
+			}
+			//open door
+			else{
+				//full fridge
+				if(fridge.foods.length > 0){
+					var foodItem = Math.floor(Math.random()*fridge.foods.length);
+					var f = fridge.foods.splice(foodItem,1)[0];
+					console.log(f);
+					terminal.push(new termOut((f.name + " added +" + f.boost + " caffeine"), "#FF9E00"));
+					coder.caffeine += f.boost;
+					if(coder.caffeine > 100)
+						coder.caffeine = 100;
+					if(fridge.foods.length == 0)
+						fridge.state = "empty";
+				}
+				//empty fridge
+				else{
+					terminal.push(new termOut("ERROR - Food not found!", "#ff0000"));
+				}
+			}
+		}
+	}
+	//table interaction
+	else if(obj == table){
+		if(!table.unlock)
+			terminal.push(new termOut("Access denied - " + obj.name + ".sh", "#ff0000"));
+		else{
+			terminal.push(new termOut(table.curThing.text, "#ffffff"));
+		}
+
+	}
+}
+
+//add a new program to the computer
+function newCode(){
+	codeStat[3] = new termOut("New code!", "#0000ff");
+	//add the books program
+	if(computer.codeCt == 0){
+		computer.programs.push(
+			new program("fridge.sh", 8, 5, 
+			function(){
+				fridge.unlock = true;
+				fridge.foods = [new food("chocolate", 10), new food("super spaghetti", 15), new food("super pizza", 20), new food("MONSTER", 50)]
+				fridge.state = "close";
+				codeStat[3] = new termOut("Fridge restocked!", "#41F1FF");
+			}));
+		computer.codeCt++;
+		return;
+	}
+	//add the fridge
+	else if(computer.codeCt == 1){
+		computer.programs.push(
+			new program("books.sh", 5, 10, 
+				function(){
+					books.unlock = true;
+					books.curQuote = Math.floor(Math.random() * books.quotes.length)
+					codeStat[3] = new termOut("New book!", "#34CA00");
+				}));
+		computer.codeCt++;
+		return;
+	}else if(computer.codeCt == 2){
+		computer.programs.push(
+		new program("table.sh", 6, 10,
+			function(){
+				table.unlock = true;
+				var newThing = Math.floor(Math.random()*table.things.length);
+				table.curThing = table.things[newThing];
+				table.state = table.curThing.name;
+				codeStat[3] = new termOut("New thing!", "#FFEA00");
+			}));
+		computer.codeCt++;
+		return;
+	}else if(computer.codeCt == 3){
+		computer.programs.push(
+			new program("win.sh", 7, 15,
+			function(){
+				gameover = true;
+				coder.canMove = false;
+				coder.code = 100;
+				codeStat[3] = new termOut("Game Won!", "#00ff00");
+			}));
+		computer.codeCt++;
+		return;
+	}
 }
 
 
@@ -419,27 +577,10 @@ function keyboard(){
 			obj = getObjInteraction(coder);
 			if(obj){
 				coder.curObject = obj;
-				if(obj == computer){
-					codeStat[1] = new termOut("  > " + computer.programs[computer.program_index].name, "#ffffff");
-					coder.canMove = false;
-				}else if(obj == coffee){
-					if(coffee.state === "full"){
-						//add to caffeine bar and cap it off
-						coder.caffeine += 25;
-						if(coder.caffeine >= 100)
-							coder.caffeine = 100;
-
-						terminal.push(new termOut("Coffee boost gained!", "#8B5907"));
-						coffee.state = "empty";
-					}
-				}else if(obj == fridge){
-					if(fridge.state === "close"){
-
-					}
-				}
+				objInteract(obj);
 			}
 		}
-  	}else{
+  	}else if(!coder.canMove && !gameover){
   		computerTerm();
   	}
 }
@@ -483,18 +624,23 @@ function computerTerm(){
   		if(keys[z_key] && coder.canInteract){
   			codeStat[2].text = ("[                         ] 0%");
   			var op = computer.curProgram.options[computer.option_index];
-  			if(op === "compile" || op === "run")
+  			if(op === "compile" || op === "run"){
   				coder.canMove = true;
-  			else {
-  				if(coder.caffeine > 10)
+  				computer.action = op;
+  			}	
+  			else{
+  				if(coder.caffeine > 20){
   					coder.canMove = false;
+  					computer.action = op;
+  				}
   				else{
   					codeStat[3] = new termOut("Not enough caffeine to code...", "#8B5907")
   					coder.canMove = true;
+  					computer.action = "options";
   				}
   			}
   			
-  			computer.action = op;
+  			
   		}
   	}
   	//finished with progress and status screen shown
@@ -504,6 +650,8 @@ function computerTerm(){
   		codeStat[2].text = "";
   		codeStat[3].text = "";
   		computer.action = "code select";
+  		computer.option_index = 0;
+  		//computer.program_index = 0;
   	}
 
   	//leave the screen
@@ -553,7 +701,7 @@ function cpu(){
 			else if(computer.action === "compile" && !inArr(computer.curProgram.options, "run")){
 				//randomly crash it
 				var buggy = Math.floor(Math.random() * computer.curProgram.bug_rate);
-				if(buggy !== 0){
+				if(buggy != 0){
 					var bugs = Math.floor(Math.random() * 3000) + 1;
 					codeStat[3] = new termOut("Compile failed! " + bugs + " bugs found", "#ff0000");
 					computer.curProgram.options = ["code"];
@@ -575,7 +723,10 @@ function cpu(){
 }
 
 
+
 //////////     RENDERING AND ANIMATIONS      ///////////
+
+
  //render everything 
 function render(){
 	checkRender();
@@ -722,9 +873,9 @@ function init(){
 	var ft = setInterval(function(){fire.anim = (fire.anim == 0 ? 1 : 0)}, 350)
 	
 	//set initial programs
-	computer.programs = [new program("code.sh", ["code"], 10, 4, function(){coder.code+=(Math.floor(Math.random()*10));this.options=["code"]}),
-				new program("fire.sh", ["code"], 3, 3, function(){codeStat[3] = new termOut("Fire set!", "#FF0000");setFire();terminal.push(new termOut(fire.obj.name + " is on fire", "#ff0000"))}),
-				new program("coffee.sh", ["code"], 5, 2, function(){codeStat[3] = new termOut("Coffee filled!", "#8B5907");coffee.state = "full"})]
+	computer.programs = [new program("code.sh", 10, 4, function(){coder.code+=20;newCode();this.options=["code"]}),
+				new program("fire.sh", 3, 3, function(){codeStat[3] = new termOut("Fire set!", "#FF0000");setFire();terminal.push(new termOut(fire.obj.name + " is on fire", "#ff0000"))}),
+				new program("coffee.sh", 4, 2, function(){codeStat[3] = new termOut("Coffee filled!", "#8B5907");coffee.state = "full"})]
 	
 	//st caffeine depletion rate
 	cft = setInterval(function(){coder.caffeine -=1;}, 1500);
@@ -744,10 +895,24 @@ function main(){
 		comp_keyTick=0;
 	}
 
-	//countdown for caffeine
+	//check for gameover status
+	if(coder.caffeine == 0 && !gameover){
+		terminal.push(new termOut("no caffeine left - GAME OVER", "#8B5907"))
+		game_stop();
+	}else if(fire.obj == computer && !gameover){
+		terminal.push(new termOut("code was burned - GAME OVER", "#ff0000"));
+		game_stop();
+	}
 
 	render();
 	keyboard();
+}
+
+function game_stop(){
+	clearInterval(cft);
+	cft = 0;
+	coder.canMove = false;
+	gameover = true;
 }
 
 main();
