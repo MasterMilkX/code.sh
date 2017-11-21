@@ -94,9 +94,24 @@ var coder = {
 	//other properties
 	canInteract : true,
 	curObject : null,
-	canMove : true
+	canMove : true,
+	batting : false
 }
 
+//baseball bat
+var batIMG = new Image();
+batIMG.src = "../img/bat.png";
+var batReady = false;
+batIMG.onload = function(){batReady = true;};
+
+var bat = {
+	x : 0,
+	y : 0,
+	width : 16,
+	height : 8, 
+	show : false,
+	anim : 0,
+}
 
 //trolls
 var trollIMG = new Image();
@@ -232,7 +247,7 @@ var fridge = {
 	state : "close",
 	anim : {"close" : 0, "full" : 1, "empty":2},
 	unlock : false,
-	foods : [new food("chocolate", 10), new food("super spaghetti", 15), new food("super pizza", 20), new food("MONSTER", 50)]
+	foods : [new food("chocolate", 10), new food("cold spaghetti", 15), new food("super pizza", 20), new food("MONSTER", 50)]
 }
 
 //food boost
@@ -401,6 +416,7 @@ function getObjbyName(name){
 function objInteract(obj){
 	//computer inteaction
 	if(obj == computer && !processing()){
+		computer.option_index = 0;
 		codeStat[1] = new termOut("  > " + computer.programs[computer.program_index].name, "#ffffff");
 		coder.canMove = false;
 	}
@@ -454,7 +470,6 @@ function objInteract(obj){
 				if(fridge.foods.length > 0){
 					var foodItem = Math.floor(Math.random()*fridge.foods.length);
 					var f = fridge.foods.splice(foodItem,1)[0];
-					console.log(f);
 					terminal.push(new termOut((f.name + " added +" + f.boost + " caffeine"), "#FF9E00"));
 					coder.caffeine += f.boost;
 					if(coder.caffeine > 100)
@@ -489,7 +504,7 @@ function newCode(){
 			new program("fridge.sh", 8, 5, 
 			function(){
 				fridge.unlock = true;
-				fridge.foods = [new food("chocolate", 10), new food("super spaghetti", 15), new food("super pizza", 20), new food("MONSTER", 50)]
+				fridge.foods = [new food("chocolate", 10), new food("cold spaghetti", 15), new food("super pizza", 20), new food("MONSTER", 50)]
 				fridge.state = "close";
 				codeStat[3] = new termOut("Fridge restocked!", "#41F1FF");
 			}));
@@ -499,7 +514,7 @@ function newCode(){
 	//add the fridge
 	else if(computer.codeCt == 1){
 		computer.programs.push(
-			new program("books.sh", 5, 10, 
+			new program("books.sh", 5, 6, 
 				function(){
 					books.unlock = true;
 					books.curQuote = Math.floor(Math.random() * books.quotes.length)
@@ -509,7 +524,7 @@ function newCode(){
 		return;
 	}else if(computer.codeCt == 2){
 		computer.programs.push(
-		new program("table.sh", 6, 10,
+		new program("table.sh", 6, 7,
 			function(){
 				table.unlock = true;
 				var newThing = Math.floor(Math.random()*table.things.length);
@@ -521,12 +536,12 @@ function newCode(){
 		return;
 	}else if(computer.codeCt == 3){
 		computer.programs.push(
-			new program("win.sh", 7, 15,
+			new program("win.sh", 7, 8,
 			function(){
-				gameover = true;
-				coder.canMove = false;
+				game_stop();
 				coder.code = 100;
 				codeStat[3] = new termOut("Game Won!", "#00ff00");
+				terminal.push(new termOut("win.sh run - Game Over!", "#00ff00"));
 			}));
 		computer.codeCt++;
 		return;
@@ -580,15 +595,26 @@ function keyboard(){
 				objInteract(obj);
 			}
 		}
+		else if(keys[downKey] && !coder.batting){
+			coder.batting = true;
+		}
   	}else if(!coder.canMove && !gameover){
   		computerTerm();
   	}
 }
 
+
+
+/////////////////		COMPUTER STUFF     /////////////////////
+
+
 //utilize the computer stuff
 function computerTerm(){
 	//code selection stage
 	if(computer.action === "code select" && scroll){
+		codeStat[2].text = "";
+		codeStat[3].text = "";
+		computer.state = "off";
   		if(keys[leftKey]){
   			if(computer.program_index > 0)
   				computer.program_index--;
@@ -622,6 +648,7 @@ function computerTerm(){
   		
   		
   		if(keys[z_key] && coder.canInteract){
+  			computer.state = "compile";
   			codeStat[2].text = ("[                         ] 0%");
   			var op = computer.curProgram.options[computer.option_index];
   			if(op === "compile" || op === "run"){
@@ -635,8 +662,11 @@ function computerTerm(){
   				}
   				else{
   					codeStat[3] = new termOut("Not enough caffeine to code...", "#8B5907")
+  					codeStat[1].text = "";
+  					codeStat[2].text = "";
   					coder.canMove = true;
-  					computer.action = "options";
+  					computer.action = "code select";
+  					computer.state = "off";
   				}
   			}
   			
@@ -694,6 +724,7 @@ function cpu(){
 			//if coded - allow to compile
 			if(computer.action === "code" && !inArr(computer.curProgram.options, "compile")){
 				computer.curProgram.options.push("compile");
+				computer.state = "off";
 				codeStat[3] = new termOut("Code finished!", "#0000ff");
 				coder.canMove = true;
 			}
@@ -704,14 +735,17 @@ function cpu(){
 				if(buggy != 0){
 					var bugs = Math.floor(Math.random() * 3000) + 1;
 					codeStat[3] = new termOut("Compile failed! " + bugs + " bugs found", "#ff0000");
+					computer.state = "crash";
 					computer.curProgram.options = ["code"];
 				}else{
 					computer.curProgram.options.push("run");
+					computer.state = "off";
 					codeStat[3] = new termOut("Compile success!", "#0000ff");
 				}
 			}
 			//if run - use the function
 			else if(computer.action === "run"){
+				computer.state = "off";
 				computer.curProgram.run_funct();
 			}
 
@@ -721,6 +755,13 @@ function cpu(){
 		}
 	}
 }
+
+
+/////////////       AI STUFF    /////////////////
+
+//hacker behavior
+
+
 
 
 
