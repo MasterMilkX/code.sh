@@ -107,10 +107,11 @@ batIMG.onload = function(){batReady = true;};
 var bat = {
 	x : 0,
 	y : 0,
-	width : 16,
-	height : 8, 
+	width : 160,
+	height : 80, 
 	show : false,
 	anim : 0,
+	row : 0,
 }
 
 //trolls
@@ -168,6 +169,28 @@ var hacker = {
 	health : 10
 
 }
+
+var bugIMG = new Image();
+bugIMG.src = "../img/bug.png";
+var bugReady = false;
+bugIMG.onload = function(){bugReady = true;};
+
+var compass = ["north", "south", "east", "west"];
+var bugMax = 4;
+function bugger(dir){
+	this.x = computer.x+Math.floor(computer.width/4);
+	this.y = computer.y+Math.floor(computer.height/4);
+	this.width = 50;
+	this.height = 50;
+	this.anim = 0;
+	this.dir = dir;
+	this.hp = 3;
+	this.hpt = 0;
+	this.speed = 10;
+	this.hit = 0;
+}
+
+var bugArmy = [];
 
 /////////    objects    //////////
 
@@ -227,7 +250,8 @@ var books = {
 			"'All your base are belong to us'",
 			"'o shit whaddup'",
 			"'Bee boo boo bop boo boo bop'"],
-	curQuote : 0
+	curQuote : 0,
+	maxQuote : 0,
 }
 
 //fridge
@@ -404,6 +428,66 @@ function getObjInteraction(character){
 	return null;
 }
 
+//check if outside the window
+function outbounds(obj){
+	if((obj.x+obj.width) < 0 || obj.x > canvas.width)
+		return true;
+	else if((obj.y + obj.height) < 0 || obj.y > 200)
+		return true;
+	else
+		return false;
+}
+
+//check if colliding pixels
+function colliding(obj1, obj2){
+
+	//get bounding box area
+	var xArea1 = [];
+	for(var z=0;z<obj1.width;z++){
+		xArea1.push(obj1.x+z);
+	}
+	var yArea1 = [];
+	for(var z=0;z<obj1.height;z++){
+		yArea1.push(obj1.y+z);
+	}
+
+	var xArea2 = [];
+	for(var z=0;z<obj2.width;z++){
+		xArea2.push(obj2.x+z);
+	}
+	var yArea2 = [];
+	for(var z=0;z<obj2.height;z++){
+		yArea2.push(obj2.y+z);
+	}
+
+	//find overlap
+	var xOver = false;
+	for(var a=0;a<xArea1.length;a++){
+		if(inArr(xArea2, xArea1[a])){
+			xOver = true;
+			break;
+		}
+	}
+	var yOver = false;
+	for(var b=0;b<yArea1.length;b++){
+		if(inArr(yArea2, yArea1[b])){
+			yOver = true;
+			break;
+		}
+	}
+
+	return xOver && yOver;
+}
+
+//get object distance
+function displacement(obj1, obj2){
+	var dist = [];
+	dist[0] = obj2.x - obj1.x;
+	dist[1] = obj2.y - obj1.y;
+	return dist;
+}
+
+
 //find object given the name
 function getObjbyName(name){
 	for(var o=0;o<stuff.length;o++){
@@ -449,6 +533,7 @@ function objInteract(obj){
 		if(!books.unlock)
 			terminal.push(new termOut("Access denied - " + obj.name + ".sh", "#ff0000"));
 		else{
+			books.curQuote = Math.round(Math.random() * books.maxQuote)
 			terminal.push(new termOut(books.quotes[books.curQuote], "#ffffff"));
 		}
 	}
@@ -517,7 +602,8 @@ function newCode(){
 			new program("books.sh", 5, 6, 
 				function(){
 					books.unlock = true;
-					books.curQuote = Math.floor(Math.random() * books.quotes.length)
+					if(books.maxQuote < books.quotes.length-1)
+						books.maxQuote++;
 					codeStat[3] = new termOut("New book!", "#34CA00");
 				}));
 		computer.codeCt++;
@@ -595,14 +681,52 @@ function keyboard(){
 				objInteract(obj);
 			}
 		}
-		else if(keys[downKey] && !coder.batting){
+		
+		//batter up
+		if(keys[downKey]){
 			coder.batting = true;
+		}else{
+			coder.batting = false;
 		}
+		batterUp();
+
   	}else if(!coder.canMove && !gameover){
   		computerTerm();
   	}
 }
 
+//baseball bat animation
+var bt;
+var swing_back = false;
+function batterUp(){
+	//update animations
+	if(keys[downKey] && bt == 0){
+		bt = setInterval(function(){
+			bat.anim += (swing_back ? -1 : 1);
+			if(bat.anim == 4 || bat.anim == 0)
+				swing_back = !swing_back
+		}, 100);
+	}else if(!keys[downKey]){
+		clearInterval(bt);
+		bt = 0;
+		bat_tick=0;
+	}
+
+	if(coder.batting){
+		bat.show = true;
+		bat.y = coder.y;
+		if(coder.dir === "right"){
+			bat.row = 0;
+			bat.x = coder.x;
+		}
+		else{
+			bat.x = coder.x-80;
+			bat.row = 1;
+		}
+	}else{
+		bat.show = false;
+	}
+}
 
 
 /////////////////		COMPUTER STUFF     /////////////////////
@@ -735,6 +859,15 @@ function cpu(){
 				if(buggy != 0){
 					var bugs = Math.floor(Math.random() * 3000) + 1;
 					codeStat[3] = new termOut("Compile failed! " + bugs + " bugs found", "#ff0000");
+					
+					//randomize bug generation
+					var bug_spawn = Math.floor(Math.random()*3);
+					console.log(bug_spawn);
+					if(bug_spawn == 0){
+						zerg_rush();
+						terminal.push(new termOut("WARNING - bug spawn!", "#6ABE30"))
+					}
+
 					computer.state = "crash";
 					computer.curProgram.options = ["code"];
 				}else{
@@ -759,9 +892,129 @@ function cpu(){
 
 /////////////       AI STUFF    /////////////////
 
-//hacker behavior
+function ai_action(){
+	infest();		//bugs
+}
+
+var mt = 0;
+var rt = 0;
+var bug_index = 0;
+
+//add bugs
+function zerg_rush(){
+	var bugNum = Math.floor(Math.random() * bugMax)+1;
+	//make some new bugs
+	for(var b=0;b<bugNum;b++){
+		var dir = compass[Math.floor(Math.random()*4)];
+		var new_bug = new bugger(dir);
+		 
+		bugArmy.push(new_bug);
+	}
+
+	//set randomized movement
+	if(mt == 0)
+		mt = setInterval(function(){scatter();}, 100);
+
+	if(rt == 0)
+		rt = setInterval(function(){
+			while(bug_index > bugArmy.length-1 && (bug_index >= 0))
+				bug_index--;
+
+			//random movement
+			if(door.state === "close"){
+				bugArmy[bug_index].dir = compass[Math.floor(Math.random()*4)];
+			}
+			//go to the door
+			else{
+				var door_center = {x : door.x+door.width/2, y:door.y+door.height/2};
+				var bug_d = displacement(bugArmy[bug_index], door_center);
+				if(Math.abs(bug_d[0]) >= Math.abs(bug_d[1])){	//move x
+					if(bug_d[0] > 0)
+						bugArmy[bug_index].dir = "east";
+					else 
+						bugArmy[bug_index].dir = "west";
+				}else{
+					if(bug_d[1] > 0)
+						bugArmy[bug_index].dir = "south";
+					else
+						bugArmy[bug_index].dir = "north";
+				}
+			}
+			
+			bug_index++;
+			if(bug_index > (bugArmy.length-1))
+				bug_index = 0;
+		}, (Math.floor(Math.random()*3)+1)*200)
+}
+
+//bug behavior
+function infest(){
+	for(var b=0;b<bugArmy.length;b++){
+		var my_bug = bugArmy[b];
+
+		//animation
+		if(my_bug.dir === "north" || my_bug.dir === "south")
+			my_bug.anim = 1;
+		else
+			my_bug.anim = 0;
+
+		//take damage
+		if(coder.batting){
+			if(my_bug.hpt == 0 && colliding(my_bug, bat)){
+				my_bug.hit = 1;
+				my_bug.hpt = setInterval(
+					function(){
+						my_bug.hp--;
+						my_bug.hit = 0;
+						clearInterval(my_bug.hpt);
+						my_bug.hpt=0;}
+				, 250);
+			}	
+		}else{
+			clearInterval(my_bug.hpt);
+			my_bug.hpt = 0;
+		}
+
+		//kill the bug
+		if(my_bug.hp <= 0){
+			bugArmy.splice(b,1);
+			terminal.push(new termOut("bug smushed", "#6ABE30"));
+			continue;
+		}
+
+		//went to the door
+		var door_center = {x : door.x+door.width/2, y:door.y+door.height/2}
+		if((door.state === "open") && colliding(bugArmy[b], door)){
+			bugArmy.splice(b,1);
+			terminal.push(new termOut("bug went out the door", "#6ABE30"));
+		}
+	}
+
+	if(bugArmy.length == 0){
+		bug_index = 0;
+		clearInterval(mt);
+		clearInterval(rt);
+		rt = 0;
+		mt = 0;
+	}
+}
 
 
+//bug movement
+function scatter(){
+	for(var b=0;b<bugArmy.length;b++){
+		var my_bug = bugArmy[b];
+		//movement
+		if(my_bug.dir === "north")
+			my_bug.y-=my_bug.speed;
+		else if(my_bug.dir === "south")
+			my_bug.y+=my_bug.speed;
+		else if(my_bug.dir === "west")
+			my_bug.x-=my_bug.speed;
+		else if(my_bug.dir === "east")
+			my_bug.x+=my_bug.speed;
+	}
+}
 
 
 
@@ -780,7 +1033,8 @@ function render(){
   		drawObject(stuff[o]);
   	}
   	drawFire();
-
+  	drawBat();
+  	drawAI();
 	drawChar(coder);				//draw the player
 	
 	stdout()						//draw the output
@@ -811,8 +1065,15 @@ function checkRender(){
 	if(!codeBarReady)
 		codeBar.onload = function(){codeBarReady = true;};
 
+	//check objects
 	if(!fireReady)
 		fireIMG.onload = function(){fireReady = true;};
+	if(!batReady)
+		batIMG.onload = function(){batReady = true;};
+
+	//check ai
+	if(!bugReady)
+		bugIMG.onload = function(){bugReady = true;}
 	
 }
 
@@ -845,8 +1106,29 @@ function drawFire(){
 			fireIMG.width/2*fire.anim, 0,
 			fireIMG.width/2, fireIMG.height,
 			fire.x, fire.y,
-			fireIMG.width/4, fireIMG.height/2
-			)
+			fireIMG.width/4, fireIMG.height/2);
+}
+
+function drawBat(){
+	if(bat.show)
+		ctx.drawImage(batIMG,
+			bat.width*bat.anim, bat.height*bat.row,
+			bat.width, bat.height,
+			bat.x, bat.y,
+			bat.width, bat.height);
+}
+
+function drawAI(){
+	for(var b=0;b<bugArmy.length;b++){
+		var bug = bugArmy[b];
+		if(bugReady){
+			ctx.drawImage(bugIMG,
+				bug.width*bug.anim, bug.height*bug.hit,
+				bug.width, bug.height,
+				bug.x, bug.y,
+				bug.width, bug.height);
+		}
+	}
 }
 
 //wrap the text if overflowing on the dialog
@@ -936,6 +1218,16 @@ function main(){
 		comp_keyTick=0;
 	}
 
+	//ai stuff
+	ai_action();
+
+
+
+	/*
+	if(bugArmy.length > 0)
+		console.log(bugArmy[0])
+	*/
+
 	//check for gameover status
 	if(coder.caffeine == 0 && !gameover){
 		terminal.push(new termOut("no caffeine left - GAME OVER", "#8B5907"))
@@ -947,10 +1239,20 @@ function main(){
 
 	render();
 	keyboard();
+
+	//debug
+	var debugStr = "DEBUG: ";
+	for(var b=0;b<bugArmy.length;b++)
+		debugStr += bugArmy[b].hpt + " " 
+					+ bugArmy[b].hp + " " 
+					+ bugArmy[b].hit + " | ";
+		
+	//document.getElementById('debug').innerHTML = debugStr;
 }
 
 function game_stop(){
 	clearInterval(cft);
+	coder.batting = false;
 	cft = 0;
 	coder.canMove = false;
 	gameover = true;
