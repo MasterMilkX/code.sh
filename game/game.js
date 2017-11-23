@@ -79,12 +79,12 @@ var coder = {
 	dir : "right",
 	img : coderIMG,
 	ready : coderReady,
+	hit : 0,
 
 	//movement
 	x : 32 * scale,
 	y : 11 * scale, 
 	speed : 3,
-	moving : false,
 	show : true,
 
 	//bars
@@ -130,15 +130,18 @@ var troll = {
 	//movement
 	x : 52 * scale,
 	y : 11 * scale, 
-	speed : 1,
-	moving : false,
-	velX : 0,
-	velY : 0,
+	speed : 5,
 	show : false,
 
 	//stats
-	time : 25,
-	health : 10
+	hp : 10,
+	moveInter : 0,
+	trollInter : 0,
+	dirInter : 0,
+	teleportInter : 0,
+	hpt : 0,
+	hit : 0,
+	trolling : false
 
 }
 
@@ -154,6 +157,7 @@ var hacker = {
 	dir : "right",
 	img : hackerIMG,
 	ready : hackerReady,
+	hit : 0,
 
 	//movement
 	x : 52 * scale,
@@ -862,7 +866,6 @@ function cpu(){
 					
 					//randomize bug generation
 					var bug_spawn = Math.floor(Math.random()*3);
-					console.log(bug_spawn);
 					if(bug_spawn == 0){
 						zerg_rush();
 						terminal.push(new termOut("WARNING - bug spawn!", "#6ABE30"))
@@ -894,7 +897,13 @@ function cpu(){
 
 function ai_action(){
 	infest();		//bugs
+	trololol();		//troll
 }
+
+
+
+////////    bugs    ///////////
+
 
 var mt = 0;
 var rt = 0;
@@ -959,19 +968,18 @@ function infest(){
 			my_bug.anim = 0;
 
 		//take damage
-		if(coder.batting){
-			if(my_bug.hpt == 0 && colliding(my_bug, bat)){
-				my_bug.hit = 1;
-				my_bug.hpt = setInterval(
-					function(){
-						my_bug.hp--;
-						my_bug.hit = 0;
-						clearInterval(my_bug.hpt);
-						my_bug.hpt=0;}
-				, 250);
-			}	
-		}else{
-			clearInterval(my_bug.hpt);
+		if(coder.batting && my_bug.hpt == 0 && colliding(my_bug, bat)){
+			my_bug.hit = 1;
+			my_bug.hpt = setTimeout(
+				function(){
+					my_bug.hp--;
+					my_bug.hit = 0;
+					clearTimeout(my_bug.hpt);
+					my_bug.hpt=0;}
+			, 250);
+		}else if(!coder.batting && my_bug.hpt != 0 && !colliding(my_bug, bat)){
+			clearTimeout(my_bug.hpt);
+			my_bug.hit = 0;
 			my_bug.hpt = 0;
 		}
 
@@ -1017,6 +1025,108 @@ function scatter(){
 }
 
 
+/////// trolls ///////
+
+var tt = setInterval(function(){if(door.state === "open" && !gameover){spoopy();}}, 10000);
+//release the troll
+function spoopy(){
+	troll.x = door.x+door.width/2;
+	troll.y = 11 * scale
+	troll.hp = 10;
+	troll.show = true;
+	troll.trolling = true;
+	terminal.push(new termOut("WARNING - troll invaded!", "#BE7705"))
+	troll.moveInter = setInterval(
+		function(){
+			if(troll.dir === "left")
+				troll.x-=troll.speed;
+			else
+				troll.x+=troll.speed;
+		}, 100);
+	troll.trollInter = setInterval(
+		function(){
+			//mess with a troll object
+			var trollObj = getObjInteraction(troll);
+			if(trollObj){
+				interfere(trollObj);
+			}
+		}, 2500);
+
+	troll.dirInter = setInterval(
+		function(){
+			var dir = Math.round(Math.random());
+			if(dir == 0){
+				troll.dir = "left";
+			}else{
+				troll.dir = "right";
+			}
+		}, 750);
+
+	troll.teleportInter = setInterval(
+		function(){
+			troll.x = Math.floor(Math.random()*600)+4;
+		}, Math.floor(Math.random()*2000)+500);
+}
+
+//troll behavior
+function trololol(){
+	if(troll.trolling){
+		clearInterval(tt);
+		tt = 0;
+		//take damage
+		if(coder.batting && troll.hpt == 0 && colliding(troll, bat)){
+			troll.hit = 1;
+			troll.hpt = setTimeout(
+				function(){
+					troll.hp--;
+					troll.hit = 0;
+					clearTimeout(troll.hpt);
+					troll.hpt = 0;}
+			, 250);
+		}	
+
+		//kill the bug
+		if(troll.hp <= 0){
+			troll.show = false;
+			clearInterval(troll.moveInter);
+			clearInterval(troll.teleportInter);
+			clearInterval(troll.dirInter);
+			clearInterval(troll.trollInter);
+			terminal.push(new termOut("troll blocked", "#BE7705"));
+			tt = setInterval(function(){if(door.state === "open" && !gameover && (Math.round(Math.random()) == 0)){spoopy();}}, 10000);		//reset trigger
+			troll.trolling = false;
+		}
+	}
+}
+
+function interfere(obj){
+	if(obj == coffee){
+		if(coffee.state === "full"){
+			coffee.state = "empty";
+			terminal.push(new termOut("troll emptied coffee", "#FFE500"))
+		}
+	}else if(obj == books){
+		//add a random book
+		var trollBook = "~TROLL~ ";
+		var alphabet = "abcdefghijklmnopqrstuvwxyz0123456789#$%@&!*^~+_-=:;><?          ";
+		var randLetter = Math.floor(Math.random()*alphabet.length);
+		for(var l=0;l<15;l++){trollBook += (alphabet.charAt(randLetter));}
+		books.quotes.unshift(trollBook);
+		terminal.push(new termOut("troll added a book", "#FFE500"))
+	}else if(obj == fridge){
+		if(coffee.state === "full"){
+			coffee.state = "empty";
+			terminal.push(new termOut("troll ate all the food", "#FFE500"))
+		}
+	}else if(obj == table){
+		if(table.state != "empty"){
+			table.state = "empty";
+			terminal.push(new termOut("troll stole item from the table", "#FFE500"))
+		}
+		
+	}
+}
+
 
 //////////     RENDERING AND ANIMATIONS      ///////////
 
@@ -1033,8 +1143,8 @@ function render(){
   		drawObject(stuff[o]);
   	}
   	drawFire();
-  	drawBat();
   	drawAI();
+  	drawBat();
 	drawChar(coder);				//draw the player
 	
 	stdout()						//draw the output
@@ -1049,8 +1159,9 @@ function render(){
 //make sure everything was imported correctly
 function checkRender(){
 	//check if player loaded
-	if(!coder.ready)
-		coder.img.onload = function(){coder.ready = true;};
+	if(!coderReady)
+		coder.img.onload = function(){coderReady = true;};
+	coder.ready = coderReady;
 
 	//check if objects loaded
 	for(var o=0;o<stuff.length;o++){
@@ -1074,6 +1185,11 @@ function checkRender(){
 	//check ai
 	if(!bugReady)
 		bugIMG.onload = function(){bugReady = true;}
+
+	if(!trollReady){
+		trollIMG.onload = function(){trollReady = true;}
+	}
+	troll.ready = trollReady;
 	
 }
 
@@ -1083,7 +1199,7 @@ function drawChar(character){
 
 	if(character.ready && character.show){
 		ctx.drawImage(character.img, 
-			character.width*dirOffset, 0,
+			character.width*dirOffset, character.height*character.hit,
 			character.width, character.height,
 			character.x, character.y,
 			character.width, character.height);
@@ -1129,6 +1245,9 @@ function drawAI(){
 				bug.width, bug.height);
 		}
 	}
+
+	drawChar(troll);
+	//drawChar(hacker);
 }
 
 //wrap the text if overflowing on the dialog
