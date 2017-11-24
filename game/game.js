@@ -65,6 +65,50 @@ var maxTerm = 4;
 var maxHistory = 20;
 
 
+////////   sound effects and music   ////////
+
+var bg_music = new Audio("../data/theme.wav");
+bg_music.loop = true;
+bg_music.volume = .50;
+bg_music.load();
+bg_music.autoplay = true;
+
+var hit_wav = new Audio("../data/hit.wav");
+var select_wav = new Audio("../data/select.wav");
+var code_wav = new Audio("../data/code_done.wav");
+var success_wav = new Audio("../data/success.wav");
+var fail_wav = new Audio("../data/crash.wav");
+var die_wav = new Audio("../data/die.wav");
+var boost_wav = new Audio("../data/boost.wav");
+var run_wav = new Audio("../data/run.wav");
+var enemy_wav = new Audio("../data/enemy.wav");
+var deny_wav = new Audio("../data/deny.wav");
+
+hit_wav.loop = false;
+select_wav.loop = false;
+code_wav.loop = false;
+success_wav.loop = false;
+fail_wav.loop = false;
+die_wav.loop = false;
+boost_wav.loop = false;
+run_wav.loop = false;
+enemy_wav.loop = false;
+deny_wav.loop = false;
+
+
+hit_wav.volume = 0.15;
+select_wav.volume = 0.15;
+code_wav.volume = 0.15;
+success_wav.volume = 0.15;
+fail_wav.volume = 0.15;
+die_wav.volume = 0.15;
+boost_wav.volume = 0.15;
+run_wav.volume = 0.15;
+enemy_wav.volume = 0.15;
+deny_wav.volume = 0.15;
+
+
+
 ////////   moving players  ////////
 
 //main player
@@ -399,6 +443,7 @@ var scroll = true;
 
 var z_key = 90;   //[Z]
 var x_key = 88;   //[X]
+var m_key = 77;   //[M]
 var actionKeySet = [z_key, x_key];
 var keys = [];
 
@@ -424,6 +469,7 @@ function setFire(){
 	fire.x = obj.x + Math.floor(obj.width/4);
 	fire.y = obj.y - Math.floor(obj.height/4);
 	fire.obj = obj;
+	enemy_wav.play();
 }
 
 //determine which object a character is in front of
@@ -511,6 +557,7 @@ function objInteract(obj){
 	if(obj == computer && !processing()){
 		if(hacker.hacking){
 	  		terminal.push(new termOut("Access denied - hack in progress", "#ff0000"));
+	  		deny_wav.play();
 	  	}else{
 	  		computer.option_index = 0;
 			codeStat[1] = new termOut("  > " + computer.programs[computer.program_index].name, "#ffffff");
@@ -527,8 +574,10 @@ function objInteract(obj){
 
 			terminal.push(new termOut("coffee boost gained!", "#8B5907"));
 			coffee.state = "empty";
+			boost_wav.play();
 		}else{
 			terminal.push(new termOut("ERROR - Coffee not found!", "#ff0000"));
+			deny_wav.play();
 		}
 	}
 	//door interaction
@@ -543,8 +592,10 @@ function objInteract(obj){
 	}
 	//books interaction
 	else if(obj == books){
-		if(!books.unlock)
+		if(!books.unlock){
 			terminal.push(new termOut("Access denied - " + obj.name + ".sh", "#ff0000"));
+			deny_wav.play();
+		}
 		else{
 			books.curQuote = Math.round(Math.random() * books.maxQuote)
 			terminal.push(new termOut(books.quotes[books.curQuote], "#ffffff"));
@@ -552,8 +603,10 @@ function objInteract(obj){
 	}
 	//fridge interaction
 	else if(obj == fridge){
-		if(!fridge.unlock)
+		if(!fridge.unlock){
 			terminal.push(new termOut("Access denied - " + obj.name + ".sh", "#ff0000"));
+			deny_wav.play();
+		}
 		else{
 			//closed door
 			if(fridge.state === "close"){
@@ -569,6 +622,7 @@ function objInteract(obj){
 					var foodItem = Math.floor(Math.random()*fridge.foods.length);
 					var f = fridge.foods.splice(foodItem,1)[0];
 					terminal.push(new termOut((f.name + " added +" + f.boost + " caffeine"), "#FF9E00"));
+					boost_wav.play();
 					coder.caffeine += f.boost;
 					if(coder.caffeine > 100)
 						coder.caffeine = 100;
@@ -578,14 +632,17 @@ function objInteract(obj){
 				//empty fridge
 				else{
 					terminal.push(new termOut("ERROR - Food not found!", "#ff0000"));
+					deny_wav.play();
 				}
 			}
 		}
 	}
 	//table interaction
 	else if(obj == table){
-		if(!table.unlock)
+		if(!table.unlock){
 			terminal.push(new termOut("Access denied - " + obj.name + ".sh", "#ff0000"));
+			deny_wav.play();
+		}
 		else{
 			terminal.push(new termOut(table.curThing.text, "#ffffff"));
 		}
@@ -641,6 +698,8 @@ function newCode(){
 				coder.code = 100;
 				codeStat[3] = new termOut("Game Won!", "#00ff00");
 				terminal.push(new termOut("win.sh run - Game Over!", "#00ff00"));
+				terminal.push(new termOut("Thanks for playing!", "#00ff00"));
+				terminal.push(new termOut("code.sh - A game by Milk", "#00ff00"));
 			}));
 		computer.codeCt++;
 		return;
@@ -655,6 +714,8 @@ document.body.addEventListener("keydown", function (e) {
 	 keys[e.keyCode] = true;
   }else if(inArr(actionKeySet, e.keyCode)){
 	 keys[e.keyCode] = true;
+  }else if(e.keyCode == m_key){
+  	!bg_music.paused ? bg_music.pause() : bg_music.play();
   }
 });
 
@@ -768,6 +829,7 @@ function computerTerm(){
   			codeStat[0].text = "coder@computer ~ $ " + computer.curProgram.name;
   			computer.action = "options";
   			coder.canInteract = false;	
+  			select_wav.play();
   		}
   	}
   	//option selection stage [code, compile, or run]
@@ -785,6 +847,7 @@ function computerTerm(){
   		
   		
   		if(keys[z_key] && coder.canInteract){
+  			select_wav.play();
   			computer.state = "compile";
   			codeStat[2].text = ("[                         ] 0%");
   			var op = computer.curProgram.options[computer.option_index];
@@ -863,6 +926,7 @@ function cpu(){
 				computer.curProgram.options.push("compile");
 				computer.state = "off";
 				codeStat[3] = new termOut("Code finished!", "#0000ff");
+				code_wav.play();
 				coder.canMove = true;
 			}
 			//if compiled, run it
@@ -872,7 +936,7 @@ function cpu(){
 				if(buggy != 0){
 					var bugs = Math.floor(Math.random() * 3000) + 1;
 					codeStat[3] = new termOut("Compile failed! " + bugs + " bugs found", "#ff0000");
-					
+					fail_wav.play();
 					//randomize bug generation
 					var bug_spawn = Math.floor(Math.random()*3);
 					if(bug_spawn == 0){
@@ -883,6 +947,7 @@ function cpu(){
 					computer.state = "crash";
 					computer.curProgram.options = ["code"];
 				}else{
+					success_wav.play();
 					computer.curProgram.options.push("run");
 					computer.state = "off";
 					codeStat[3] = new termOut("Compile success!", "#0000ff");
@@ -892,6 +957,7 @@ function cpu(){
 			else if(computer.action === "run"){
 				computer.state = "off";
 				computer.curProgram.run_funct();
+				run_wav.play();
 			}
 
 			computer.action = "fini";
@@ -980,6 +1046,7 @@ function infest(){
 		//take damage
 		if(coder.batting && my_bug.hpt == 0 && colliding(my_bug, bat)){
 			my_bug.hit = 1;
+			hit_wav.play();
 			my_bug.hpt = setTimeout(
 				function(){
 					my_bug.hp--;
@@ -996,6 +1063,7 @@ function infest(){
 		//kill the bug
 		if(my_bug.hp <= 0){
 			bugArmy.splice(b,1);
+			die_wav.play();
 			terminal.push(new termOut("bug smushed", "#6ABE30"));
 			continue;
 		}
@@ -1090,6 +1158,7 @@ function trololol(){
 		//take damage
 		if(coder.batting && troll.hpt == 0 && colliding(troll, bat)){
 			troll.hit = 1;
+			hit_wav.play();
 			troll.hpt = setTimeout(
 				function(){
 					troll.hp--;
@@ -1106,6 +1175,7 @@ function trololol(){
 			clearInterval(troll.teleportInter);
 			clearInterval(troll.dirInter);
 			clearInterval(troll.trollInter);
+			die_wav.play();
 			terminal.push(new termOut("troll blocked", "#BE7705"));
 			tt = setInterval(function(){
 				if(door.state === "open" && !gameover && (Math.floor(Math.random()*3) == 0)){
@@ -1121,6 +1191,7 @@ function interfere(obj){
 	if(obj == coffee){
 		if(coffee.state === "full"){
 			coffee.state = "empty";
+			enemy_wav.play();
 			terminal.push(new termOut("troll emptied coffee", "#FFE500"))
 		}
 	}else if(obj == books){
@@ -1130,15 +1201,18 @@ function interfere(obj){
 		var randLetter = Math.floor(Math.random()*alphabet.length);
 		for(var l=0;l<15;l++){trollBook += (alphabet.charAt(randLetter));}
 		books.quotes.unshift(trollBook);
+		enemy_wav.play();
 		terminal.push(new termOut("troll added a book", "#FFE500"))
 	}else if(obj == fridge){
 		if(coffee.state === "full"){
 			coffee.state = "empty";
+			enemy_wav.play();
 			terminal.push(new termOut("troll ate all the food", "#FFE500"))
 		}
 	}else if(obj == table){
 		if(table.state != "empty"){
 			table.state = "empty";
+			enemy_wav.play();
 			terminal.push(new termOut("troll stole item from the table", "#FFE500"))
 		}
 		
@@ -1176,6 +1250,7 @@ function hack_the_planet(){
 
 	if(coder.batting && hacker.hpt == 0 && colliding(hacker, bat) && hacker.show){
 		hacker.hit = 1;
+		hit_wav.play();
 		hacker.hpt = setTimeout(
 			function(){
 				hacker.hp--;
@@ -1203,6 +1278,7 @@ function hack_the_planet(){
 		//kill the hacker
 		if(hacker.hp <= 0){
 			hacker.show = false;
+			die_wav.play();
 			terminal.push(new termOut("hacker stopped", "#ffffff"));
 			hackClock = setInterval(function(){
 				haxorz();
@@ -1240,6 +1316,7 @@ function virus(){
 		terminal.push(new termOut(infectCode.name + " was hacked", "#ff0000"));
 		codeStat[3] = new termOut("Code hacked!", "#ff0000");
 		comp_keyTick = 0;
+		enemy_wav.play();
 	}else{
 		codeStat[3].text = "";
 	}
@@ -1479,7 +1556,7 @@ function main(){
 	*/
 
 	//check for gameover status
-	if(coder.caffeine == 0 && !gameover){
+	if(coder.caffeine <= 0 && !gameover){
 		terminal.push(new termOut("no caffeine left - GAME OVER", "#8B5907"))
 		game_stop();
 	}else if(fire.obj == computer && !gameover){
@@ -1502,10 +1579,15 @@ function main(){
 
 function game_stop(){
 	clearInterval(cft);
+	clearInterval(hackClock);
+	clearInterval(tt);
 	coder.batting = false;
 	cft = 0;
+	hackClock = 0;
+	tt = 0;
 	coder.canMove = false;
 	gameover = true;
+	bg_music.pause()
 }
 
 main();
