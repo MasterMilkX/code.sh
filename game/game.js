@@ -150,6 +150,12 @@ var hackerIMG = new Image();
 hackerIMG.src = "../img/hacker3.png";
 var hackerReady = false;
 hackerIMG.onload = function(){hackerReady=true;};
+var hackTime = 180
+var hackClock = setInterval(function(){
+	haxorz();
+	door.state = "open";
+	hackTime = Math.floor(Math.random()*180) + 60;
+}, hackTime*1000);
 
 var hacker = {
 	width : 8*scale,
@@ -162,15 +168,14 @@ var hacker = {
 	//movement
 	x : 52 * scale,
 	y : 11 * scale, 
-	speed : 1,
-	moving : false,
-	velX : 0,
-	velY : 0,
+	speed : 7,
 	show : false,
 
 	//stats
-	time : 25,
-	health : 10
+	hp : 10,
+	hpt : 0,
+	hit : 0,
+	hacking : false
 
 }
 
@@ -504,9 +509,13 @@ function getObjbyName(name){
 function objInteract(obj){
 	//computer inteaction
 	if(obj == computer && !processing()){
-		computer.option_index = 0;
-		codeStat[1] = new termOut("  > " + computer.programs[computer.program_index].name, "#ffffff");
-		coder.canMove = false;
+		if(hacker.hacking){
+	  		terminal.push(new termOut("Access denied - hack in progress", "#ff0000"));
+	  	}else{
+	  		computer.option_index = 0;
+			codeStat[1] = new termOut("  > " + computer.programs[computer.program_index].name, "#ffffff");
+			coder.canMove = false;
+	  	}
 	}
 	//coffee interaction
 	else if(obj == coffee){
@@ -590,7 +599,7 @@ function newCode(){
 	//add the books program
 	if(computer.codeCt == 0){
 		computer.programs.push(
-			new program("fridge.sh", 8, 5, 
+			new program("fridge.sh", 8, 3, 
 			function(){
 				fridge.unlock = true;
 				fridge.foods = [new food("chocolate", 10), new food("cold spaghetti", 15), new food("super pizza", 20), new food("MONSTER", 50)]
@@ -603,7 +612,7 @@ function newCode(){
 	//add the fridge
 	else if(computer.codeCt == 1){
 		computer.programs.push(
-			new program("books.sh", 5, 6, 
+			new program("books.sh", 5, 4, 
 				function(){
 					books.unlock = true;
 					if(books.maxQuote < books.quotes.length-1)
@@ -614,7 +623,7 @@ function newCode(){
 		return;
 	}else if(computer.codeCt == 2){
 		computer.programs.push(
-		new program("table.sh", 6, 7,
+		new program("table.sh", 6, 5,
 			function(){
 				table.unlock = true;
 				var newThing = Math.floor(Math.random()*table.things.length);
@@ -626,7 +635,7 @@ function newCode(){
 		return;
 	}else if(computer.codeCt == 3){
 		computer.programs.push(
-			new program("win.sh", 7, 8,
+			new program("win.sh", 7, 6,
 			function(){
 				game_stop();
 				coder.code = 100;
@@ -694,7 +703,7 @@ function keyboard(){
 		}
 		batterUp();
 
-  	}else if(!coder.canMove && !gameover){
+  	}else if(!coder.canMove && !gameover && !hacker.hacking){
   		computerTerm();
   	}
 }
@@ -896,8 +905,9 @@ function cpu(){
 /////////////       AI STUFF    /////////////////
 
 function ai_action(){
-	infest();		//bugs
-	trololol();		//troll
+	infest();			//bugs
+	trololol();			//troll
+	hack_the_planet(); 	//hacker
 }
 
 
@@ -1027,7 +1037,11 @@ function scatter(){
 
 /////// trolls ///////
 
-var tt = setInterval(function(){if(door.state === "open" && !gameover){spoopy();}}, 10000);
+var tt = setInterval(function(){
+				if(door.state === "open" && !gameover && (Math.floor(Math.random()*3) == 0)){
+					spoopy();
+				}
+			}, 10000);		//reset trigger
 //release the troll
 function spoopy(){
 	troll.x = door.x+door.width/2;
@@ -1065,7 +1079,7 @@ function spoopy(){
 	troll.teleportInter = setInterval(
 		function(){
 			troll.x = Math.floor(Math.random()*600)+4;
-		}, Math.floor(Math.random()*2000)+500);
+		}, Math.floor(Math.random()*2000)+1000);
 }
 
 //troll behavior
@@ -1093,7 +1107,11 @@ function trololol(){
 			clearInterval(troll.dirInter);
 			clearInterval(troll.trollInter);
 			terminal.push(new termOut("troll blocked", "#BE7705"));
-			tt = setInterval(function(){if(door.state === "open" && !gameover && (Math.round(Math.random()) == 0)){spoopy();}}, 10000);		//reset trigger
+			tt = setInterval(function(){
+				if(door.state === "open" && !gameover && (Math.floor(Math.random()*3) == 0)){
+					spoopy();
+				}
+			}, 10000);		//reset trigger
 			troll.trolling = false;
 		}
 	}
@@ -1126,6 +1144,109 @@ function interfere(obj){
 		
 	}
 }
+
+
+//////  hacker  ///////
+
+//add the hacker
+function haxorz(){
+	hacker.x = door.x+door.width/2;
+	hacker.y = 11 * scale
+	hacker.hp = 10;
+	hacker.show = true;
+	hacker.hacking = false;
+	terminal.push(new termOut("WARNING - hacker breach!", "#ffffff"))
+	hacker.moveInter = setInterval(
+		function(){
+			if(hacker.x > (computer.x+computer.width/2)){
+				hacker.dir = "left";
+				hacker.x -= hacker.speed;
+			}
+		}, 100);
+}
+
+//hacker behavior
+function hack_the_planet(){
+	if(hacker.x <= (computer.x+computer.width/2) && coder.canMove && !hacker.hacking && hacker.show){
+		hacker.hacking = true;
+	}
+
+	//anti-virus
+	//take damage
+
+	if(coder.batting && hacker.hpt == 0 && colliding(hacker, bat) && hacker.show){
+		hacker.hit = 1;
+		hacker.hpt = setTimeout(
+			function(){
+				hacker.hp--;
+				hacker.hit = 0;
+				clearTimeout(hacker.hpt);
+				hacker.hpt = 0;}
+		, 250);
+	}
+
+
+	if(hacker.hacking){
+		clearInterval(hackClock);
+		hackClock = 0;
+
+
+
+		if(processing()){
+			clearInterval(ct);
+			ct = 0;
+			comp_keyTick=0;
+			computer.state = "compile";
+			computer.action = "hack";
+		}
+
+		//kill the hacker
+		if(hacker.hp <= 0){
+			hacker.show = false;
+			terminal.push(new termOut("hacker stopped", "#ffffff"));
+			hackClock = setInterval(function(){
+				haxorz();
+				door.state = "open";
+				hackTime = Math.floor(Math.random()*180) + 60;
+			}, hackTime*1000);
+			computer.action = "fini";
+			clearInterval(ct);
+			ct = 0;
+			hacker.hacking = false;
+		}
+
+	}
+}
+
+
+//run the hack
+function virus(){
+
+	codeStat[1].text = "  > hack_code.sh";
+
+	var percent = comp_keyTick / 7;
+	var bar_perc = Math.floor(percent *25);
+	var progress_bar = "[";
+
+	for(var a=0;a<bar_perc;a++){progress_bar +="#";}
+	for(var a=0;a<(25-bar_perc);a++){progress_bar +=" ";}
+	progress_bar += "] " + Math.floor(percent*100) + "%";
+	codeStat[2].text = (progress_bar);
+
+	if(percent == 1){
+		var infectIndex = Math.floor(Math.random()*computer.programs.length);
+		var infectCode = computer.programs[infectIndex];
+		infectCode.options = ["code"];
+		terminal.push(new termOut(infectCode.name + " was hacked", "#ff0000"));
+		codeStat[3] = new termOut("Code hacked!", "#ff0000");
+		comp_keyTick = 0;
+	}else{
+		codeStat[3].text = "";
+	}
+
+
+}
+
 
 
 //////////     RENDERING AND ANIMATIONS      ///////////
@@ -1190,6 +1311,11 @@ function checkRender(){
 		trollIMG.onload = function(){trollReady = true;}
 	}
 	troll.ready = trollReady;
+
+	if(!hackerReady){
+		hackerIMG.onload = function(){hackerReady = true;}
+	}
+	hacker.ready = hackerReady;
 	
 }
 
@@ -1247,7 +1373,7 @@ function drawAI(){
 	}
 
 	drawChar(troll);
-	//drawChar(hacker);
+	drawChar(hacker);
 }
 
 //wrap the text if overflowing on the dialog
@@ -1315,8 +1441,8 @@ function init(){
 	var ft = setInterval(function(){fire.anim = (fire.anim == 0 ? 1 : 0)}, 350)
 	
 	//set initial programs
-	computer.programs = [new program("code.sh", 10, 4, function(){coder.code+=20;newCode();this.options=["code"]}),
-				new program("fire.sh", 3, 3, function(){codeStat[3] = new termOut("Fire set!", "#FF0000");setFire();terminal.push(new termOut(fire.obj.name + " is on fire", "#ff0000"))}),
+	computer.programs = [new program("code.sh", 10, 2, function(){coder.code+=20;newCode();this.options=["code"]}),
+				new program("fire.sh", 3, 2, function(){codeStat[3] = new termOut("Fire set!", "#FF0000");setFire();terminal.push(new termOut(fire.obj.name + " is on fire", "#ff0000"))}),
 				new program("coffee.sh", 4, 2, function(){codeStat[3] = new termOut("Coffee filled!", "#8B5907");coffee.state = "full"})]
 	
 	//st caffeine depletion rate
@@ -1329,12 +1455,17 @@ function main(){
 	canvas.focus();
 
 	//countdown for compiler
-	if(processing() && ct == 0){
+	if(processing() && ct == 0 && !hacker.hacking){
 		ct = setInterval(function(){comp_keyTick+=1;cpu();}, 1000);
-	}else if(!processing()){
+	}else if(!processing() && !hacker.hacking){
 		clearInterval(ct);
 		ct = 0;
 		comp_keyTick=0;
+	}
+
+	//countdown for hackker execution
+	if(hacker.hacking && ct == 0){
+		ct = setInterval(function(){comp_keyTick+=1;virus();}, 1000);
 	}
 
 	//ai stuff
